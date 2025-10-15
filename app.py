@@ -2,14 +2,14 @@ import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS 
 
-from book_manager import insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
+from book_manager import id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
+from converter import BookConverter
 from db import connect_db, init_db
 
-
 app = Flask(__name__)
-CORS(app)
-
+BOOKS_FOLDER = os.path.join(os.path.dirname(__file__), 'bundle test')
 init_db()
+CORS(app)
 
 @app.route("/")
 def home():
@@ -98,6 +98,30 @@ def delete_book(title):
             
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
+
+@app.route("/books/<file_path>/convert", methods=["POST"])
+def check_file_first(file_path):
+    try:
+        full_file_path = os.path.join(BOOKS_FOLDER, file_path)
+
+        if not os.path.exists(full_file_path):
+            return jsonify({"error": "File not found"}), 404
+            
+        is_epub_file = id_pub_file_book(full_file_path)
+
+        if not is_epub_file:
+            return jsonify({"error": "File is not an EPUB file, cannot be converted."}), 415
+        else:
+            converter = BookConverter(BOOKS_FOLDER)
+            pdf_path = converter.convert_epub_to_pdf(full_file_path)
+            
+            return jsonify({
+                "success": "File converted to PDF.",
+                "pdf_path": os.path.basename(pdf_path)
+            }), 201
+            
+    except Exception as e:
+        return jsonify({"error": f"Conversion error: {e}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

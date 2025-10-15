@@ -1,8 +1,8 @@
 import os
-import sqlite3
+from pathlib import Path
+import filetype
 
-from flask import jsonify
-
+from converter import BookConverter
 from db import connect_db
 
 def list_books(folder_path):
@@ -94,3 +94,21 @@ def remove_book(title):
                 
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+def id_pub_file_book(file_path):
+    if not os.path.exists(file_path):
+        return False
+    
+    try:
+        kind = filetype.guess(file_path)
+        if kind and kind.extension == 'pub':
+            return True
+        
+        file_extension = Path(file_path).suffix.lower()
+        if file_extension == '.pub':
+            return True
+            
+        return False
+    except Exception as e:
+        print(f"Error checking file type: {e}")
+        return False

@@ -67,6 +67,7 @@ def read_or_not(title):
                 book = c.fetchone()
                 
                 if book: 
+
                     c.execute('UPDATE books SET read = CASE WHEN read = 1 THEN 0 ELSE 1 END WHERE title = ?', (title,))
 
                     return {"success": True, "message": f"Book '{title}' read"}

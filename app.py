@@ -1,10 +1,13 @@
 import os
 from flask import Flask, jsonify, request
+from flask_cors import CORS 
 
 from book_manager import insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
 from db import connect_db, init_db
 
+
 app = Flask(__name__)
+CORS(app)
 
 init_db()
 

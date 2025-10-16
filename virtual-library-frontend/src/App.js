@@ -4,8 +4,7 @@ import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <h1>Virtual Library</h1>
+    <div>
       <BookList />
     </div>
   );

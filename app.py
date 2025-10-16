@@ -1,8 +1,8 @@
 import os
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS 
 
-from book_manager import id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
+from book_manager import add_converted_book_to_db, does_it_exists, find_pdf_version, get_book_title_by_path, id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
 from converter import BookConverter
 from db import connect_db, init_db
 
@@ -99,10 +99,13 @@ def delete_book(title):
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
 
-@app.route("/books/<file_path>/convert", methods=["POST"])
-def check_file_first(file_path):
+@app.route("/books/convert", methods=["POST"])
+def convert_book():
+    data = request.get_json()
+    file_path = data.get('file_path')
+
     try:
-        full_file_path = os.path.join(BOOKS_FOLDER, file_path)
+        full_file_path = file_path
 
         if not os.path.exists(full_file_path):
             return jsonify({"error": "File not found"}), 404
@@ -110,18 +113,39 @@ def check_file_first(file_path):
         is_epub_file = id_pub_file_book(full_file_path)
 
         if not is_epub_file:
-            return jsonify({"error": "File is not an EPUB file, cannot be converted."}), 415
+            return jsonify({"error": "File is not an EPUB file"}), 415
         else:
-            converter = BookConverter(BOOKS_FOLDER)
+            converter = BookConverter()
             pdf_path = converter.convert_epub_to_pdf(full_file_path)
             
+            original_title = get_book_title_by_path(full_file_path)
+            
+            add_converted_book_to_db(original_title, pdf_path)
+            
             return jsonify({
-                "success": "File converted to PDF.",
-                "pdf_path": os.path.basename(pdf_path)
+                "success": "File converted to PDF and added to library.",
+                "pdf_path": pdf_path
             }), 201
             
     except Exception as e:
         return jsonify({"error": f"Conversion error: {e}"}), 500
+
+@app.route("/books/<string:title>/view", methods=["GET"])
+def view_books(title):
+    try:
+        original_path = does_it_exists(title)
+        if not original_path:
+            return jsonify({"error": "Book not found"}), 404
+        
+        pdf_path = find_pdf_version(original_path)
+        if not pdf_path:
+            return jsonify({"error": "PDF version not found. Convert EPUB first."}), 404
+
+        return send_file(pdf_path, as_attachment=False, mimetype='application/pdf')
+        
+    except Exception as e:
+        return jsonify({"error": f"Error serving file: {e}"}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)

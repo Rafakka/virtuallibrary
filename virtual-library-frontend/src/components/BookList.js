@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllBooks, deleteBook, toggleReadStatus } from '../services/api';
+import { getAllBooks, deleteBook, toggleReadStatus, convertBook, getBookFilePath } from '../services/api';
 import SearchBar from './SearchBar';
 
 const BookList = () => {
@@ -35,7 +35,23 @@ const BookList = () => {
       console.error('Toggle failed:', error);
     }
   }
-
+  
+  const handleOpenInBrowser = async (book) => {
+    if (book.extension === '.pdf') {
+      window.location.href = `http://localhost:5000/books/${encodeURIComponent(book.title)}/view`;
+    } else {
+      const shouldConvert = window.confirm('Convert to PDF?');
+      if (shouldConvert) {
+        try {
+          const filePath = await getBookFilePath(book.title);
+          await convertBook(filePath);
+          window.location.href = `http://localhost:5000/books/${encodeURIComponent(book.title)}/view`;
+        } catch (error) {
+          alert('Cannot open book: ' + error.message);
+        }
+      }
+    }
+  };
   const handleDelete = async (bookTitle) => {
       try {
         await deleteBook(bookTitle);
@@ -79,6 +95,9 @@ const BookList = () => {
           </button>
           <button onClick={() => handleReadStatus(book.title)}>
             {book.read ? 'Mark as Unread' : 'Mark as Read'}
+          </button>
+          <button onClick={() => handleOpenInBrowser(book)}>
+            Open in Browser
           </button>
         </div>
       ))}

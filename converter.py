@@ -7,8 +7,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import re
 
 class BookConverter:
-    def __init__(self, books_folder):
-        self.books_folder = books_folder
+    def __init__(self):
+        pass
     
     def convert_epub_to_pdf(self, original_path):
         try:
@@ -25,6 +25,7 @@ class BookConverter:
         except Exception as e:
             raise Exception(f"EPUB conversion failed: {str(e)}")
     
+
     def _extract_epub_as_text(self, book):
         text_parts = []
         for item in book.get_items():

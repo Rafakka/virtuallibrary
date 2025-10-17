@@ -42,7 +42,7 @@ const BookList = () => {
       
       // Reload the books list
       await loadBooks();
-      console.log('📚 Books reloaded');
+      alert('📚 Books reloaded');
       
       } catch (err) {
         console.error('❌ Sync error details:', err);

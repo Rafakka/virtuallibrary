@@ -6,28 +6,32 @@ const api = axios.create({
   timeout: 10000,
 });
 
+export const getBooksFolder = async () => {
+  try {
+    const response = await api.get('/config/books-folder');
+    return response.data.books_folder;
+  } catch (error) {
+    console.error('Error getting books folder:', error);
+    throw error;
+  }
+};
+
+
 // GET all books
 export const getAllBooks = async () => {
   try {
     const response = await api.get('/books');
-    return response.data;  // Returns the array of books
+    return response.data;
   } catch (error) {
     console.error('Error fetching books:', error);
-    throw error;  // Re-throw so components can handle it
+    throw error;
   }
 };
 
 // POST - Sync books from folder
 export const syncBooks = async (folderPath) => {
-  try {
-    const response = await api.post('/booksdb', {
-      folder_path: folderPath
-    });
-    return response.data;  // Returns { message, books_added, total_books_found }
-  } catch (error) {
-    console.error('Error syncing books:', error);
-    throw error;
-  }
+  const response = await api.post('/booksdb', { folder_path: folderPath });
+  return response.data;
 };
 
 // GET - Search books by title
@@ -41,7 +45,6 @@ export const searchBooks = async (title) => {
   }
 };
 
-
 export const convertBook = async (filePath) => {
   const response = await api.post('/books/convert', { file_path: filePath });
   console.log('File path:', filePath);
@@ -49,20 +52,15 @@ export const convertBook = async (filePath) => {
 };
 
 // PATCH - Toggle read status
-export const toggleReadStatus = async (title) => {
-  try {
-    const response = await api.patch(`/books/${encodeURIComponent(title)}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error toggling read status:', error);
-    throw error;
-  }
+export const toggleReadStatus = async (bookId) => {
+  const response = await api.patch(`/books/${bookId}/read`);
+  return response.data;
 };
 
 // DELETE - Remove book
-export const deleteBook = async (title) => {
+export const deleteBook = async (bookId) => {
   try {
-    const response = await api.delete(`/books/${encodeURIComponent(title)}`);
+    const response = await api.delete(`/books/${bookId}`);
     return response.data;
   } catch (error) {
     console.error('Error deleting book:', error);

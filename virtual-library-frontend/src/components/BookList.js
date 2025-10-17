@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllBooks, deleteBook, toggleReadStatus, convertBook, getBookFilePath } from '../services/api';
+import { getAllBooks, deleteBook, toggleReadStatus, convertBook, getBookFilePath, getBooksFolder, syncBooks } from '../services/api';
 import SearchBar from './SearchBar';
 
 const BookList = () => {
@@ -27,15 +27,40 @@ const BookList = () => {
     }
   };
   
-  const handleReadStatus = async (bookTitle) => {
+  const syncBooksButtom = async () => {
     try {
-      await toggleReadStatus(bookTitle);
+      setLoading(true);
+      console.log('🔄 Starting sync...');
+      
+      // Get the books folder from backend
+      const booksFolder = await getBooksFolder();
+      console.log('📁 Books folder:', booksFolder);
+      
+      // Sync the books - USE THE IMPORTED FUNCTION
+      const syncResult = await syncBooks(booksFolder); // ← FIXED!
+      console.log('✅ Sync result:', syncResult);
+      
+      // Reload the books list
+      await loadBooks();
+      console.log('📚 Books reloaded');
+      
+      } catch (err) {
+        console.error('❌ Sync error details:', err);
+        console.error('❌ Sync error response:', err.response);
+        setError('Failed to sync books: ' + (err.response?.data?.error || err.message));
+      } finally {
+        setLoading(false);
+    }
+  };
+  
+  const handleReadStatus = async (bookId) => {
+    try {
+      await toggleReadStatus(bookId);
       loadBooks();
     } catch (error) {
       console.error('Toggle failed:', error);
     }
   }
-  
   const handleOpenInBrowser = async (book) => {
     if (book.extension === '.pdf') {
       window.location.href = `http://localhost:5000/books/${encodeURIComponent(book.title)}/view`;
@@ -52,6 +77,7 @@ const BookList = () => {
       }
     }
   };
+  
   const handleDelete = async (bookTitle) => {
       try {
         await deleteBook(bookTitle);
@@ -113,7 +139,7 @@ const BookList = () => {
           </div>
           {!isSearching && (
             <button 
-              onClick={loadBooks}
+              onClick={syncBooksButtom}
               className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
             >
               🔄 Refresh Library
@@ -159,13 +185,13 @@ const BookList = () => {
                     👁️ Open
                   </button>
                   <button 
-                    onClick={() => handleReadStatus(book.title)}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
-                  >
-                    {book.read ? '↶ Unread' : '✓ Read'}
-                  </button>
+                      onClick={() => handleReadStatus(book.id)}
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                    >
+                    {book.read ? '↶ Not read' : '✓ Read'}
+                    </button>
                   <button 
-                    onClick={() => handleDelete(book.title)}
+                    onClick={() => handleDelete(book.id)}
                     className="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
                   >
                     🗑️ Delete

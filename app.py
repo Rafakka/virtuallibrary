@@ -15,6 +15,10 @@ CORS(app)
 def home():
     return {"message": "Welcome to the Virtual Library!"}
 
+@app.route("/config/books-folder", methods=["GET"])
+def get_books_folder():
+    return jsonify({"books_folder": BOOKS_FOLDER})
+
 @app.route("/booksdb", methods=["POST"])
 def update_books():
     data = request.get_json()
@@ -74,30 +78,16 @@ def get_book_by_name(title):
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
     
-@app.route("/books/<string:title>", methods=["PATCH"])
-def update_book(title):
+@app.route("/books/<int:book_id>", methods=["DELETE"])
+def delete_book(book_id):
     try:
-        result = read_or_not(title)
-        if result["success"]:
-            return jsonify({"message": result["message"]})
-        else:
-            return jsonify({"error": result["message"]}), 404
-
+        with connect_db() as conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM books WHERE id = ?', (book_id,))
+            conn.commit()
+            return {"success": True, "message": f"Book REGISTER deleted successfully, for it to remove do it manually, please."}
     except Exception as e:
-        return jsonify({"error": f"Database error: {e}"}), 500
-
-@app.route("/books/<string:title>", methods=["DELETE"])
-def delete_book(title):
-    try:
-        result = remove_book(title)
-        
-        if result["success"]:
-            return jsonify({"message": result["message"]})
-        else:
-            return jsonify({"error": result["message"]}), 404
-            
-    except Exception as e:
-        return jsonify({"error": f"Database error: {e}"}), 500
+        return {"success": False, "error": str(e)}
 
 @app.route("/books/convert", methods=["POST"])
 def convert_book():
@@ -146,6 +136,24 @@ def view_books(title):
     except Exception as e:
         return jsonify({"error": f"Error serving file: {e}"}), 500
 
+
+@app.route("/books/<int:book_id>/read", methods=["PATCH"])
+def toggle_read_status(book_id):
+    try:
+        with connect_db() as conn:
+            c = conn.cursor()
+            c.execute('SELECT * FROM books WHERE id = ?', (book_id,))
+            book = c.fetchone()
+            
+            if book:
+                c.execute('UPDATE books SET read = CASE WHEN read THEN 0 ELSE 1 END WHERE id = ?', (book_id,))
+                conn.commit()
+                return {"success": True, "message": f"Book read status toggled"}
+            else:
+                return {"success": False, "message": f"Book not found"}
+                
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     app.run(debug=True)

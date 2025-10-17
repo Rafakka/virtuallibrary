@@ -97,6 +97,18 @@ const BookList = () => {
     }
   };
 
+  const handleRename = async (bookId, currentTitle) => {
+  const newTitle = prompt('Enter new book title:', currentTitle);
+  if (newTitle && newTitle !== currentTitle) {
+    try {
+      await renameBook(bookId, newTitle);
+      loadBooks();
+      } catch (error) {
+        alert('Rename failed: ' + error.message);
+      }
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
@@ -183,6 +195,12 @@ const BookList = () => {
                     className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
                   >
                     👁️ Open
+                  </button>
+                    <button 
+                      onClick={() => handleRename(book.id, book.title)}
+                      className="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                    >
+                      ✏️ Rename
                   </button>
                   <button 
                       onClick={() => handleReadStatus(book.id)}

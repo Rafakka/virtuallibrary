@@ -155,5 +155,19 @@ def toggle_read_status(book_id):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+@app.route("/books/<int:book_id>/rename", methods=["PATCH"])
+def rename_book(book_id):
+    data = request.get_json()
+    new_title = data.get('new_title')
+    
+    try:
+        with connect_db() as conn:
+            c = conn.cursor()
+            c.execute('UPDATE books SET title = ? WHERE id = ?', (new_title, book_id))
+            conn.commit()
+            return {"success": True, "message": f"Book renamed to {new_title}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 if __name__ == "__main__":
     app.run(debug=True)

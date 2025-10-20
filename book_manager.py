@@ -107,23 +107,6 @@ def read_or_not(book_id):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def remove_book(title):
-    try:
-        with connect_db() as conn:
-            c = conn.cursor()
-            c.execute('SELECT * FROM books WHERE title = ?', (title,))
-            book = c.fetchone()
-            
-            if book:
-                c.execute('DELETE FROM books WHERE title = ?', (title,))
-
-                return {"success": True, "message": f"Book '{title}' deleted"}
-            else:
-                return {"success": False, "message": f"Book '{title}' not found"}
-                
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
 def remove_book(book_id):
     try:
         with connect_db() as conn:
@@ -186,17 +169,6 @@ def does_it_exists(title):
         print(f"Database error: {e}") 
         return None
 
-def find_pdf_version(original_path):
-    
-    if id_pdf_file_book(original_path):
-        return original_path
-    
-    converted_path = get_converted_pdf_path(original_path)
-    if os.path.exists(converted_path):
-        return converted_path
-    
-    return None
-
 def get_converted_pdf_path(original_path):
     """Get path of converted PDF"""
     base = os.path.splitext(original_path)[0]
@@ -229,3 +201,19 @@ def get_book_title_by_path(file_path):
     except Exception as e:
         print(f"Error getting book title: {e}")
         raise
+
+def id_pub_file_book(file_path):
+    """Check if file is an EPUB"""
+    if not os.path.exists(file_path):
+        return False
+    
+    try:
+        
+        file_extension = Path(file_path).suffix.lower()
+        if file_extension == '.epub':
+            return True
+            
+        return False
+    except Exception as e:
+        print(f"Error checking EPUB file type: {e}")
+        return False

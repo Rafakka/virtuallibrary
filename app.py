@@ -1,4 +1,5 @@
 import os
+import shutil
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS 
 
@@ -83,23 +84,20 @@ def delete_book(book_id):
     try:
         with connect_db() as conn:
             c = conn.cursor()
-            # Get book info first
             c.execute('SELECT * FROM books WHERE id = ?', (book_id,))
             book = c.fetchone()
             
             if book:
-                # Create deleted folder if it doesn't exist
+
                 deleted_folder = os.path.join(BOOKS_FOLDER, 'deleted')
                 os.makedirs(deleted_folder, exist_ok=True)
                 
-                # Move file to deleted folder
                 original_path = book['path']
                 if os.path.exists(original_path):
                     filename = os.path.basename(original_path)
                     new_path = os.path.join(deleted_folder, filename)
                     shutil.move(original_path, new_path)
                 
-                # Delete from database
                 c.execute('DELETE FROM books WHERE id = ?', (book_id,))
                 conn.commit()
                 

@@ -5,6 +5,7 @@ import shutil
 import webbrowser
 import filetype
 
+from app import BOOKS_FOLDER
 from converter import BookConverter
 from db import connect_db
 
@@ -73,13 +74,11 @@ def add_converted_book_to_db(original_title, pdf_path):
         with connect_db() as conn:
             c = conn.cursor()
             
-            # Check if PDF already exists in database
             c.execute('SELECT id FROM books WHERE path = ?', (pdf_path,))
             if c.fetchone():
                 print(f"PDF already in database: {pdf_path}")
                 return
-            
-            # Add PDF version to database
+
             c.execute('''
                 INSERT INTO books (title, extension, path) 
                 VALUES (?, ?, ?)
@@ -115,9 +114,9 @@ def remove_book(book_id):
             book = c.fetchone()
             
             if book:
-                # Move file to deleted folder
+                
                 original_path = book['path']
-                deleted_folder = os.path.join(os.path.dirname(original_path), 'deleted')
+                deleted_folder = os.path.join(BOOKS_FOLDER, 'deleted')
                 os.makedirs(deleted_folder, exist_ok=True)
                 
                 if os.path.exists(original_path):
@@ -125,9 +124,11 @@ def remove_book(book_id):
                     new_path = os.path.join(deleted_folder, filename)
                     shutil.move(original_path, new_path)
                     print(f"📁 Moved {filename} to deleted folder")
+                    
+                    c.execute('UPDATE books SET path = ? WHERE id = ?', (new_path, book_id))
                 
-                # Delete from database
                 c.execute('DELETE FROM books WHERE id = ?', (book_id,))
+                conn.commit()
                 return {"success": True, "message": f"Book moved to deleted folder"}
             else:
                 return {"success": False, "message": f"Book not found"}
@@ -217,3 +218,24 @@ def id_pub_file_book(file_path):
     except Exception as e:
         print(f"Error checking EPUB file type: {e}")
         return False
+
+def cleanup_orphaned_books():
+    """Remove database entries for files that don't exist"""
+    try:
+        with connect_db() as conn:
+            c = conn.cursor()
+            c.execute('SELECT id, path FROM books')
+            books = c.fetchall()
+            
+            orphaned_count = 0
+            for book in books:
+                if not os.path.exists(book['path']):
+                    c.execute('DELETE FROM books WHERE id = ?', (book['id'],))
+                    orphaned_count += 1
+                    print(f"🧹 Removed orphaned book: {book['path']}")
+            
+            conn.commit()
+            return orphaned_count
+    except Exception as e:
+        print(f"Error cleaning orphaned books: {e}")
+        return 0

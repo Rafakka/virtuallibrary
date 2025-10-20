@@ -63,17 +63,28 @@ const BookList = () => {
   }; // ← ADDED MISSING CLOSING BRACE AND SEMICOLON
 
   const handleOpenInBrowser = async (book) => {
-    if (book.extension === '.pdf') {
-      setReadingBook(book); // ← CHANGED: Use PDFReader instead of window.location
-    } else {
-      const shouldConvert = window.confirm('Convert to PDF?');
-      if (shouldConvert) {
-        try {
-          const filePath = await getBookFilePath(book.title);
-          await convertBook(filePath);
-          setReadingBook(book); // ← CHANGED: Use PDFReader after conversion
-        } catch (error) {
-          alert('Cannot open book: ' + error.message);
+  console.log('📖 Opening book:', book.title, 'Extension:', book.extension);
+  if (book.extension === '.pdf') {
+    console.log('✅ Direct PDF - opening reader');
+    setReadingBook(book);
+  } else {
+    console.log('🔄 EPUB detected - asking for conversion');
+    const shouldConvert = window.confirm('Convert to PDF?');
+    if (shouldConvert) {
+      try {
+        console.log('📁 Getting file path for:', book.title);
+        const filePath = await getBookFilePath(book.title);
+        console.log('📍 File path:', filePath);
+        
+        console.log('🔄 Starting conversion...');
+        await convertBook(filePath);
+        console.log('✅ Conversion completed');
+        
+        console.log('📖 Opening converted PDF');
+        setReadingBook(book);
+      } catch (error) {
+        console.error('❌ Conversion failed:', error);
+        alert('Cannot open book: ' + error.message);
         }
       }
     }

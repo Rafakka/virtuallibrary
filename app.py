@@ -3,7 +3,7 @@ import shutil
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS 
 
-from book_manager import add_converted_book_to_db, does_it_exists, find_pdf_version, get_book_title_by_path, id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
+from book_manager import add_converted_book_to_db, cleanup_orphaned_books, does_it_exists, find_pdf_version, get_book_title_by_path, id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
 from converter import BookConverter
 from db import connect_db, init_db
 
@@ -62,7 +62,6 @@ def get_books():
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
 
-
 @app.route("/books/<string:title>", methods=["GET"])
 def get_book_by_name(title): 
     try:
@@ -78,7 +77,7 @@ def get_book_by_name(title):
 
     except Exception as e:
         return jsonify({"error": f"Database error: {e}"}), 500
-    
+
 @app.route("/books/<int:book_id>", methods=["DELETE"])
 def delete_book(book_id):
     try:
@@ -101,34 +100,42 @@ def delete_book(book_id):
                 c.execute('DELETE FROM books WHERE id = ?', (book_id,))
                 conn.commit()
                 
-                return {"success": True, "message": f"Book moved to deleted folder and won't be scanned again"}
+                return jsonify({"success": True, "message": f"Book moved to deleted folder and won't be scanned again"})
             else:
-                return {"success": False, "message": "Book not found"}
+                return jsonify({"success": False, "message": "Book not found"}), 404
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return jsonify({"success": False, "error": str(e)}), 500
     
 @app.route("/books/convert", methods=["POST"])
 def convert_book():
+    print("🔄 Conversion endpoint called!")
     data = request.get_json()
     file_path = data.get('file_path')
+    print(f"📁 Converting file: {file_path}")
 
     try:
         full_file_path = file_path
 
         if not os.path.exists(full_file_path):
+            print("❌ File not found")
             return jsonify({"error": "File not found"}), 404
             
         is_epub_file = id_pub_file_book(full_file_path)
+        print(f"📖 Is EPUB file: {is_epub_file}")
 
         if not is_epub_file:
             return jsonify({"error": "File is not an EPUB file"}), 415
         else:
+            print("🔄 Starting BookConverter...")
             converter = BookConverter()
             pdf_path = converter.convert_epub_to_pdf(full_file_path)
+            print(f"✅ Conversion successful: {pdf_path}")
             
             original_title = get_book_title_by_path(full_file_path)
+            print(f"📝 Original title: {original_title}")
             
             add_converted_book_to_db(original_title, pdf_path)
+            print("💾 Added to database")
             
             return jsonify({
                 "success": "File converted to PDF and added to library.",
@@ -136,6 +143,7 @@ def convert_book():
             }), 201
             
     except Exception as e:
+        print(f"❌ Conversion error: {e}")
         return jsonify({"error": f"Conversion error: {e}"}), 500
 
 @app.route("/books/<string:title>/view", methods=["GET"])
@@ -153,7 +161,6 @@ def view_books(title):
         
     except Exception as e:
         return jsonify({"error": f"Error serving file: {e}"}), 500
-
 
 @app.route("/books/<int:book_id>/read", methods=["PATCH"])
 def toggle_read_status(book_id):
@@ -173,17 +180,14 @@ def rename_book(book_id):
             c = conn.cursor()
             c.execute('UPDATE books SET title = ? WHERE id = ?', (new_title, book_id))
             conn.commit()
-            return {"success": True, "message": f"Book renamed to {new_title}"}
+            return jsonify({"success": True, "message": f"Book renamed to {new_title}"})
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route("/books/<int:book_id>", methods=["DELETE"])
-def delete_book(book_id):
-    result = remove_book(book_id)
-    if result["success"]:
-        return jsonify(result)
-    else:
-        return jsonify(result), 404
+@app.route("/cleanup-orphaned", methods=["POST"])
+def cleanup_orphaned():
+    count = cleanup_orphaned_books()
+    return jsonify({"message": f"Cleaned up {count} orphaned books"})
 
 if __name__ == "__main__":
     app.run(debug=True)

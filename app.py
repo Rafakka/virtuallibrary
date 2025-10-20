@@ -88,7 +88,6 @@ def delete_book(book_id):
             book = c.fetchone()
             
             if book:
-
                 deleted_folder = os.path.join(BOOKS_FOLDER, 'deleted')
                 os.makedirs(deleted_folder, exist_ok=True)
                 
@@ -97,16 +96,17 @@ def delete_book(book_id):
                     filename = os.path.basename(original_path)
                     new_path = os.path.join(deleted_folder, filename)
                     shutil.move(original_path, new_path)
+                    print(f"📁 Moved {filename} to deleted folder")
                 
                 c.execute('DELETE FROM books WHERE id = ?', (book_id,))
                 conn.commit()
                 
-                return {"success": True, "message": f"Book moved to deleted folder"}
+                return {"success": True, "message": f"Book moved to deleted folder and won't be scanned again"}
             else:
                 return {"success": False, "message": "Book not found"}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
+    
 @app.route("/books/convert", methods=["POST"])
 def convert_book():
     data = request.get_json()
@@ -157,21 +157,11 @@ def view_books(title):
 
 @app.route("/books/<int:book_id>/read", methods=["PATCH"])
 def toggle_read_status(book_id):
-    try:
-        with connect_db() as conn:
-            c = conn.cursor()
-            c.execute('SELECT * FROM books WHERE id = ?', (book_id,))
-            book = c.fetchone()
-            
-            if book:
-                c.execute('UPDATE books SET read = CASE WHEN read THEN 0 ELSE 1 END WHERE id = ?', (book_id,))
-                conn.commit()
-                return {"success": True, "message": f"Book read status toggled"}
-            else:
-                return {"success": False, "message": f"Book not found"}
-                
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    result = read_or_not(book_id)
+    if result["success"]:
+        return jsonify(result)
+    else:
+        return jsonify(result), 404
 
 @app.route("/books/<int:book_id>/rename", methods=["PATCH"])
 def rename_book(book_id):
@@ -186,6 +176,14 @@ def rename_book(book_id):
             return {"success": True, "message": f"Book renamed to {new_title}"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+@app.route("/books/<int:book_id>", methods=["DELETE"])
+def delete_book(book_id):
+    result = remove_book(book_id)
+    if result["success"]:
+        return jsonify(result)
+    else:
+        return jsonify(result), 404
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import platform
+import shutil
 import webbrowser
 import filetype
 
@@ -10,8 +11,13 @@ from db import connect_db
 def list_books(folder_path):
     supported_extensions = ['.pdf', '.epub', '.mobi']
     found_books = []
-
+    
+    deleted_folder = os.path.join(folder_path, 'deleted')
+    
     for root, dirs, files in os.walk(folder_path):
+        if root.startswith(deleted_folder):
+            continue
+            
         for file in files:
             ext = os.path.splitext(file)[1].lower()
             if ext in supported_extensions:
@@ -85,24 +91,21 @@ def add_converted_book_to_db(original_title, pdf_path):
         print(f"❌ Error adding converted PDF to database: {e}")
         raise
 
-def read_or_not(title):
+def read_or_not(book_id):
     try:
-            with connect_db() as conn:
-                c = conn.cursor()
-                c.execute('SELECT * FROM books WHERE title = ?', (title,))
-                book = c.fetchone()
+        with connect_db() as conn:
+            c = conn.cursor()
+            c.execute('SELECT * FROM books WHERE id = ?', (book_id,))
+            book = c.fetchone()
+            
+            if book: 
+                c.execute('UPDATE books SET read = CASE WHEN read = 1 THEN 0 ELSE 1 END WHERE id = ?', (book_id,))
+                return {"success": True, "message": f"Book read status toggled"}
+            else:
+                return {"success": False, "message": f"Book not found"}
                 
-                if book: 
-
-                    c.execute('UPDATE books SET read = CASE WHEN read = 1 THEN 0 ELSE 1 END WHERE title = ?', (title,))
-
-                    return {"success": True, "message": f"Book '{title}' read"}
-                else:
-                    return {"success": False, "message": f"Book '{title}' not found"}
-                    
     except Exception as e:
-            return {"success": False, "error": str(e)}
-
+        return {"success": False, "error": str(e)}
 
 def remove_book(title):
     try:
@@ -121,29 +124,33 @@ def remove_book(title):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def id_pub_file_book(file_path):
-    print(f"🔍 Checking EPUB for: {file_path}")  # Debug
-    
-    if not os.path.exists(file_path):
-        print("❌ File doesn't exist")
-        return False
-    
+def remove_book(book_id):
     try:
-        # Check file extension first
-        file_extension = Path(file_path).suffix.lower()
-        print(f"📄 File extension: {file_extension}")  # Debug
-        
-        if file_extension == '.epub':
-            print("✅ Valid EPUB by extension")
-            return True
+        with connect_db() as conn:
+            c = conn.cursor()
+            c.execute('SELECT * FROM books WHERE id = ?', (book_id,))
+            book = c.fetchone()
             
-        # kind = filetype.guess(file_path)
-        # print(f"File type detection: {kind}")
-            
-        return False
+            if book:
+                # Move file to deleted folder
+                original_path = book['path']
+                deleted_folder = os.path.join(os.path.dirname(original_path), 'deleted')
+                os.makedirs(deleted_folder, exist_ok=True)
+                
+                if os.path.exists(original_path):
+                    filename = os.path.basename(original_path)
+                    new_path = os.path.join(deleted_folder, filename)
+                    shutil.move(original_path, new_path)
+                    print(f"📁 Moved {filename} to deleted folder")
+                
+                # Delete from database
+                c.execute('DELETE FROM books WHERE id = ?', (book_id,))
+                return {"success": True, "message": f"Book moved to deleted folder"}
+            else:
+                return {"success": False, "message": f"Book not found"}
+                
     except Exception as e:
-        print(f"❌ Error checking file type: {e}")
-        return False
+        return {"success": False, "error": str(e)}
     
 def id_pdf_file_book(file_path):
     if not os.path.exists(file_path):

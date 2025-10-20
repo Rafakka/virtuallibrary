@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAllBooks, deleteBook, toggleReadStatus, convertBook, getBookFilePath, getBooksFolder, syncBooks } from '../services/api';
+import { getAllBooks, deleteBook, renameBook, toggleReadStatus, convertBook, getBookFilePath, getBooksFolder, syncBooks } from '../services/api';
 import SearchBar from './SearchBar';
 import PDFReader from './PDFReader';
 
@@ -9,7 +9,8 @@ const BookList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [readingBook, setReadingBook] = useState(null)
+  const [readingBook, setReadingBook] = useState(null);
+
   useEffect(() => {
     loadBooks();
   }, []);
@@ -34,24 +35,21 @@ const BookList = () => {
       setLoading(true);
       console.log('🔄 Starting sync...');
       
-      // Get the books folder from backend
       const booksFolder = await getBooksFolder();
       console.log('📁 Books folder:', booksFolder);
       
-      // Sync the books - USE THE IMPORTED FUNCTION
-      const syncResult = await syncBooks(booksFolder); // ← FIXED!
+      const syncResult = await syncBooks(booksFolder);
       console.log('✅ Sync result:', syncResult);
       
-      // Reload the books list
       await loadBooks();
       alert('📚 Books reloaded');
       
-      } catch (err) {
-        console.error('❌ Sync error details:', err);
-        console.error('❌ Sync error response:', err.response);
-        setError('Failed to sync books: ' + (err.response?.data?.error || err.message));
-      } finally {
-        setLoading(false);
+    } catch (err) {
+      console.error('❌ Sync error details:', err);
+      console.error('❌ Sync error response:', err.response);
+      setError('Failed to sync books: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -62,17 +60,18 @@ const BookList = () => {
     } catch (error) {
       console.error('Toggle failed:', error);
     }
+  }; // ← ADDED MISSING CLOSING BRACE AND SEMICOLON
 
   const handleOpenInBrowser = async (book) => {
     if (book.extension === '.pdf') {
-      window.location.href = `http://localhost:5000/books/${encodeURIComponent(book.title)}/view`;
+      setReadingBook(book); // ← CHANGED: Use PDFReader instead of window.location
     } else {
       const shouldConvert = window.confirm('Convert to PDF?');
       if (shouldConvert) {
         try {
           const filePath = await getBookFilePath(book.title);
           await convertBook(filePath);
-          window.location.href = `http://localhost:5000/books/${encodeURIComponent(book.title)}/view`;
+          setReadingBook(book); // ← CHANGED: Use PDFReader after conversion
         } catch (error) {
           alert('Cannot open book: ' + error.message);
         }
@@ -80,13 +79,13 @@ const BookList = () => {
     }
   };
   
-  const handleDelete = async (bookTitle) => {
-      try {
-        await deleteBook(bookTitle);
-        loadBooks();
-      } catch (error) {
-        console.error('Delete failed:', error);
-      }
+  const handleDelete = async (bookId) => { // ← CHANGED: Should be bookId, not bookTitle
+    try {
+      await deleteBook(bookId);
+      loadBooks();
+    } catch (error) {
+      console.error('Delete failed:', error);
+    }
   };
   
   const handleSearchResults = (searchResults) => {
@@ -100,11 +99,11 @@ const BookList = () => {
   };
 
   const handleRename = async (bookId, currentTitle) => {
-  const newTitle = prompt('Enter new book title:', currentTitle);
-  if (newTitle && newTitle !== currentTitle) {
-    try {
-      await renameBook(bookId, newTitle);
-      loadBooks();
+    const newTitle = prompt('Enter new book title:', currentTitle);
+    if (newTitle && newTitle !== currentTitle) {
+      try {
+        await renameBook(bookId, newTitle);
+        loadBooks();
       } catch (error) {
         alert('Rename failed: ' + error.message);
       }
@@ -135,107 +134,99 @@ const BookList = () => {
       </div>
     </div>
   );
+
   return (
-  <div>
-    {/* Show PDF Reader if a book is being read, otherwise show the library */}
-    {readingBook ? (
-      <PDFReader 
-        bookId={readingBook.id}
-        bookTitle={readingBook.title}
-        onClose={() => setReadingBook(null)}
-      />
-    ) : (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">📚 My Virtual Library</h1>
-            <p className="text-gray-600 text-lg">{displayedBooks.length} books in your collection</p>
-          </div>
+    <div>
+      {readingBook ? (
+        <PDFReader 
+          bookId={readingBook.id}
+          bookTitle={readingBook.title}
+          onClose={() => setReadingBook(null)}
+        />
+      ) : (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-12">
+              <h1 className="text-4xl font-bold text-gray-800 mb-4">📚 My Virtual Library</h1>
+              <p className="text-gray-600 text-lg">{displayedBooks.length} books in your collection</p>
+            </div>
 
-          {/* Search & Controls */}
-          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex-1 w-full">
-                <SearchBar onSearchResults={handleSearchResults} />
+            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex-1 w-full">
+                  <SearchBar onSearchResults={handleSearchResults} />
+                </div>
+                {!isSearching && (
+                  <button 
+                    onClick={syncBooksButtom}
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
+                  >
+                    🔄 Refresh Library
+                  </button>
+                )}
               </div>
-              {!isSearching && (
-                <button 
-                  onClick={syncBooksButtom}
-                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:scale-105"
-                >
-                  🔄 Refresh Library
-                </button>
-              )}
             </div>
-          </div>
 
-          {/* Books Grid */}
-          {displayedBooks.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📖</div>
-              <h3 className="text-2xl font-semibold text-gray-700">No books found</h3>
-              <p className="text-gray-500">Try a different search or refresh your library</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {displayedBooks.map(book => (
-                <div key={book.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
-                  {/* Book Card */}
-                  <div className="p-6">
-                    {/* Title */}
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">{book.title}</h3>
-                    
-                    {/* Metadata */}
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <span className="bg-gray-100 px-2 py-1 rounded">📄 {book.extension}</span>
-                      </div>
-                      <div className="flex items-center text-sm">
-                        <span className={`px-2 py-1 rounded-full ${book.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {book.read ? '✅ Read' : '📖 Unread'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      <button 
-                        onClick={() => handleOpenInBrowser(book)}
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
-                      >
-                        👁️ Open
-                      </button>
-                      <button 
-                        onClick={() => handleRename(book.id, book.title)}
-                        className="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
-                      >
-                        ✏️ Rename
-                      </button>
-                      <button 
-                        onClick={() => handleReadStatus(book.id)}
-                        className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
-                      >
-                        {book.read ? '↶ Not read' : '✓ Read'}
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(book.id)}
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
-                      >
-                        🗑️ Delete
-                      </button>
+            {displayedBooks.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📖</div>
+                <h3 className="text-2xl font-semibold text-gray-700">No books found</h3>
+                <p className="text-gray-500">Try a different search or refresh your library</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {displayedBooks.map(book => (
+                  <div key={book.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden">
+                    <div className="p-6">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">{book.title}</h3>
+                      
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <span className="bg-gray-100 px-2 py-1 rounded">📄 {book.extension}</span>
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <span className={`px-2 py-1 rounded-full ${book.read ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {book.read ? '✅ Read' : '📖 Unread'}
+                          </span>
                         </div>
                       </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button 
+                          onClick={() => handleOpenInBrowser(book)}
+                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          👁️ Open
+                        </button>
+                        <button 
+                          onClick={() => handleRename(book.id, book.title)}
+                          className="flex-1 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          ✏️ Rename
+                        </button>
+                        <button 
+                          onClick={() => handleReadStatus(book.id)}
+                          className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          {book.read ? '↶ Not read' : '✓ Read'}
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(book.id)}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    );
-  }
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default BookList;

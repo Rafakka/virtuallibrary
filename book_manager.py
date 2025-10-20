@@ -5,7 +5,6 @@ import shutil
 import webbrowser
 import filetype
 
-from app import BOOKS_FOLDER
 from converter import BookConverter
 from db import connect_db
 
@@ -114,9 +113,10 @@ def remove_book(book_id):
             book = c.fetchone()
             
             if book:
-                
+                # Move file to deleted folder - use the file's directory
                 original_path = book['path']
-                deleted_folder = os.path.join(BOOKS_FOLDER, 'deleted')
+                file_directory = os.path.dirname(original_path)  # Get directory of the file
+                deleted_folder = os.path.join(file_directory, 'deleted')  # Create deleted folder in same directory
                 os.makedirs(deleted_folder, exist_ok=True)
                 
                 if os.path.exists(original_path):
@@ -124,11 +124,9 @@ def remove_book(book_id):
                     new_path = os.path.join(deleted_folder, filename)
                     shutil.move(original_path, new_path)
                     print(f"📁 Moved {filename} to deleted folder")
-                    
-                    c.execute('UPDATE books SET path = ? WHERE id = ?', (new_path, book_id))
                 
+                # Delete from database
                 c.execute('DELETE FROM books WHERE id = ?', (book_id,))
-                conn.commit()
                 return {"success": True, "message": f"Book moved to deleted folder"}
             else:
                 return {"success": False, "message": f"Book not found"}

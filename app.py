@@ -8,13 +8,17 @@ from converter import BookConverter
 from db import connect_db, init_db
 from config_manager import get_books_folder, set_books_folder, load_config
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='virtual-library-frontend/build', static_url_path='')
 init_db()
 CORS(app)
 
 config = load_config()
 
-@app.route("/")
+@app.route('/')
+def serve_react():
+    return send_file('virtual-library-frontend/build/index.html')
+
+@app.route("/api/")
 def home():
     return {"message": "Welcome to the Virtual Library!"}
 
@@ -214,5 +218,9 @@ def cleanup_orphaned():
     count = cleanup_orphaned_books()
     return jsonify({"message": f"Cleaned up {count} orphaned books"})
 
-if __name__ == "__main__":
-    app.run(debug=True)
+@app.errorhandler(404)
+def not_found(e):
+    return send_file('virtual-library-frontend/build/index.html')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)

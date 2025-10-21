@@ -6,28 +6,52 @@ from flask_cors import CORS
 from book_manager import add_converted_book_to_db, cleanup_orphaned_books, does_it_exists, find_pdf_version, get_book_title_by_path, id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
 from converter import BookConverter
 from db import connect_db, init_db
+from config_manager import get_books_folder, set_books_folder, load_config
 
 app = Flask(__name__)
-BOOKS_FOLDER = os.path.join(os.path.dirname(__file__), 'bundle test')
 init_db()
 CORS(app)
+
+config = load_config()
 
 @app.route("/")
 def home():
     return {"message": "Welcome to the Virtual Library!"}
 
 @app.route("/config/books-folder", methods=["GET"])
-def get_books_folder():
-    return jsonify({"books_folder": BOOKS_FOLDER})
+def get_books_folder_endpoint():
+    current_folder = get_books_folder()
+    return jsonify({"books_folder": current_folder})
+
+@app.route("/config/books-folder", methods=["POST"])
+def update_books_folder():
+    data = request.get_json()
+    new_folder = data.get('folder_path')
+    
+    if not new_folder or not os.path.exists(new_folder):
+        return jsonify({"error": "Folder path does not exist"}), 400
+    
+    try:
+        success = set_books_folder(new_folder)
+        if success:
+            return jsonify({
+                "success": True, 
+                "message": f"Books folder updated to {new_folder}",
+                "books_folder": new_folder
+            })
+        else:
+            return jsonify({"error": "Failed to save configuration"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/booksdb", methods=["POST"])
 def update_books():
     data = request.get_json()
     
     if not data or 'folder_path' not in data:
-        return jsonify({'error': 'folder_path is required'}), 400
-    
-    folder_path = data.get("folder_path")
+        folder_path = get_books_folder()
+    else:
+        folder_path = data.get("folder_path")
     
     if not os.path.exists(folder_path):
         return jsonify({'error': 'Folder path does not exist'}), 400
@@ -87,7 +111,8 @@ def delete_book(book_id):
             book = c.fetchone()
             
             if book:
-                deleted_folder = os.path.join(BOOKS_FOLDER, 'deleted')
+                current_books_folder = get_books_folder()
+                deleted_folder = os.path.join(current_books_folder, 'deleted')
                 os.makedirs(deleted_folder, exist_ok=True)
                 
                 original_path = book['path']

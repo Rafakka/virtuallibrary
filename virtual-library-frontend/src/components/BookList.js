@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { getAllBooks, deleteBook, renameBook, toggleReadStatus, convertBook, getBookFilePath, getBooksFolder, syncBooks } from '../services/api';
 import SearchBar from './SearchBar';
 import PDFReader from './PDFReader';
+import Settings from './Settings';
 
 const BookList = () => {
   const [books, setBooks] = useState([]);
   const [displayedBooks, setDisplayedBooks] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -60,7 +62,7 @@ const BookList = () => {
     } catch (error) {
       console.error('Toggle failed:', error);
     }
-  }; // ← ADDED MISSING CLOSING BRACE AND SEMICOLON
+  };
 
   const handleOpenInBrowser = async (book) => {
   console.log('📖 Opening book:', book.title, 'Extension:', book.extension);
@@ -90,7 +92,7 @@ const BookList = () => {
     }
   };
   
-  const handleDelete = async (bookId) => { // ← CHANGED: Should be bookId, not bookTitle
+  const handleDelete = async (bookId) => {
     try {
       await deleteBook(bookId);
       loadBooks();
@@ -148,6 +150,7 @@ const BookList = () => {
 
   return (
     <div>
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
       {readingBook ? (
         <PDFReader 
           bookId={readingBook.id}
@@ -160,8 +163,14 @@ const BookList = () => {
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold text-gray-800 mb-4">📚 My Virtual Library</h1>
               <p className="text-gray-600 text-lg">{displayedBooks.length} books in your collection</p>
+              <button
+            onClick={() => setShowSettings(true)}
+            className="mt-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+          >
+            ⚙️ Settings
+          </button>
             </div>
-
+      </div>
             <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
               <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div className="flex-1 w-full">

@@ -1,22 +1,40 @@
 import os
 import shutil
+import sys
+import threading
+import webbrowser
+
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS 
-
 from book_manager import add_converted_book_to_db, cleanup_orphaned_books, does_it_exists, find_pdf_version, get_book_title_by_path, id_pub_file_book, insert_book_if_not_exists, list_books, read_or_not, remove_book, search_books_by_title
 from converter import BookConverter
 from db import connect_db, init_db
 from config_manager import get_books_folder, set_books_folder, load_config
 
 app = Flask(__name__, static_folder='virtual-library-frontend/build', static_url_path='')
+
 init_db()
 CORS(app)
-
 config = load_config()
+
+if getattr(sys, 'frozen', False):
+    base_dir = sys._MEIPASS
+    react_build_path = os.path.join(base_dir, 'virtual-library-frontend', 'build')
+else:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    react_build_path = os.path.join(base_dir, 'virtual-library-frontend', 'build')
+
+app = Flask(__name__, static_folder=react_build_path, static_url_path='')
+
+def open_browser():
+    """Open browser to localhost:5000"""
+    import time
+    time.sleep(2)
+    webbrowser.open("http://localhost:5000")
 
 @app.route('/')
 def serve_react():
-    return send_file('virtual-library-frontend/build/index.html')
+    return send_file(os.path.join(react_build_path, 'index.html'))
 
 @app.route("/api/")
 def home():
@@ -223,4 +241,8 @@ def not_found(e):
     return send_file('virtual-library-frontend/build/index.html')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    browser_thread = threading.Thread(target=open_browser)
+    browser_thread.daemon = True
+    browser_thread.start()
+    
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

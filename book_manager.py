@@ -93,12 +93,18 @@ def read_or_not(book_id):
     try:
         with connect_db() as conn:
             c = conn.cursor()
-            c.execute('SELECT * FROM books WHERE id = ?', (book_id,))
-            book = c.fetchone()
+            c.execute('SELECT read FROM books WHERE id = ?', (book_id,))
+            result = c.fetchone()
             
-            if book: 
-                c.execute('UPDATE books SET read = CASE WHEN read = 1 THEN 0 ELSE 1 END WHERE id = ?', (book_id,))
-                return {"success": True, "message": f"Book read status toggled"}
+            if result:
+                current_status = result[0]
+                new_status = 1 if not current_status else 0
+                
+                c.execute('UPDATE books SET read = ? WHERE id = ?', (new_status, book_id))
+                conn.commit()
+                
+                status_text = "read" if new_status else "unread"
+                return {"success": True, "message": f"Book marked as {status_text}"}
             else:
                 return {"success": False, "message": f"Book not found"}
                 

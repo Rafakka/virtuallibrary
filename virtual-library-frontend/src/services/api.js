@@ -85,3 +85,8 @@ export const renameBook = async (bookId, newTitle) => {
   const response = await api.patch(`/books/${bookId}/rename`, { new_title: newTitle });
   return response.data;
 };
+
+export const updateBooksFolder = async (folderPath) => {
+  const response = await api.post('/config/books-folder', { folder_path: folderPath });
+  return response.data;
+};

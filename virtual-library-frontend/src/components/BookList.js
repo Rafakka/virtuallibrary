@@ -55,15 +55,18 @@ const BookList = () => {
     }
   };
   
-  const handleReadStatus = async (bookId) => {
+  const handleReadStatus = async (bookId, bookTitle) => {
     try {
-      await toggleReadStatus(bookId);
+      const result = await toggleReadStatus(bookId);
+      
+      alert(result.message || "Read status updated");
+      
       loadBooks();
     } catch (error) {
       console.error('Toggle failed:', error);
+      alert('Failed to update read status');
     }
-  };
-
+  }
   const handleOpenInBrowser = async (book) => {
   console.log('📖 Opening book:', book.title, 'Extension:', book.extension);
   if (book.extension === '.pdf') {
@@ -170,7 +173,7 @@ const BookList = () => {
             ⚙️ Settings
           </button>
             </div>
-      </div>
+                </div>
             <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
               <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <div className="flex-1 w-full">
@@ -243,7 +246,6 @@ const BookList = () => {
               </div>
             )}
           </div>
-        </div>
       )}
     </div>
   );
